@@ -27,11 +27,13 @@ def clone_repo(repo_url: str, repo_path: str = "workspace/repo"): # input -- rep
 def list_directory(repo_path: str):
     path = Path(repo_path)
 
+    files = []
+
     for item in path.rglob("*"):            # rglob("*") = inside repo --- all files and folders search
         if item.is_file():                  # only files r needed -- folders ignored 
-            print(item.relative_to(path))   # File ka repo ke clean relative path print 
+            files.append(str(item.relative_to(path)))   # File ka repo ke clean relative path print 
 
-
+    return files # list of files 
     # path = workspace/repo
     # item = workspace/repo/backend/app.py
     #relative_to(path) means: "path wala starting part hata do."

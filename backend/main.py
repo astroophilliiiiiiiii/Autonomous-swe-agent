@@ -1,31 +1,22 @@
 from tools.repo import clone_repo , list_directory
 from tools.file_tools import read_file
+from agents.file_selector import create_file_selector
+from backend.llm import llm
 #Python mein module ke andar defined functions/classes by default importable hote hain. _ se start => private
 
-#python -m backend.main # no error in the import 
-# __pycache makes .pyc files that makes import shorter and faster version of files -- easier for imports 
-
 # input of the repo and the task to perform in the repo
-
-#------------------------------------------input------------------------------------------------------------
 repo = input("GitHub Repository: ")   #⏳TASK :-- validator -- repo is in the right format and validity check 
 task = input("Task: ")
 
-print("\nRepository:", repo)
-print("Task:", task)
+repo_path = clone_repo(repo)                    # cloning the repo 
+files = list_directory(repo_path)               # listing all the files 
 
-#------------------------------------------cloning the repo------------------------------------------------------------
-repo_path = clone_repo(repo)
-print("Local repository:", repo_path)
+file_selector = create_file_selector(llm)       #  chain returned -- need to invoke it 
+result = file_selector.invoke({ "task" : task , "files" : files })
 
-#------------------------------------------lisitng all the files in repo -----------------------------------------------
-print("\nFiles in repository:")
-list_directory(repo_path)
+print("\nRelevant files:")
+print(result.content)
 
-#------------------------------------------reading the file -----------------------------------------------------------
-file_path = input("\nEnter file to read: ")
 
-content = read_file(file_path)
 
-print("\nFile content:\n")
-print(content)
+
