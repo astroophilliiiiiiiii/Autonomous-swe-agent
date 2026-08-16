@@ -27,9 +27,17 @@ def clone_repo(repo_url: str, repo_path: str = "workspace/repo"): # input -- rep
 def list_directory(repo_path: str):
     path = Path(repo_path)
 
+    ignored_dirs = {".git","__pycache__","venv","node_modules"}
+
     files = []
 
     for item in path.rglob("*"):            # rglob("*") = inside repo --- all files and folders search
+
+        relative_path = item.relative_to(path)
+
+        if any(part in ignored_dirs for part in relative_path.parts):
+            continue
+
         if item.is_file():                  # only files r needed -- folders ignored 
             files.append(str(item.relative_to(path)))   # File ka repo ke clean relative path print 
 
