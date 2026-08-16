@@ -10,3 +10,6 @@ def read_file(file_path: str):
     # file ke andr kaa text returned 
     return path.read_text(encoding="utf-8")   # utf-8 to correctlly read the file 
 
+def write_file(file_path: str, content: str): # file to change , content 
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write(content)
