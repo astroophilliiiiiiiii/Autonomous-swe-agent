@@ -5,6 +5,7 @@ from tools.file_tools import write_file
 from agents.testing_agent import testing_agent
 from langgraph.graph import StateGraph, START, END
 from agents.debug_agent import create_debug_agent
+from agents.understand_agent import create_understand_agent
 
 class AgentState(TypedDict):
     repo_path: str      # where is repo 
@@ -45,6 +46,19 @@ def testing_node(state):
     return state
 
 
+def understand_node(state):
+    understand_agent = create_understand_agent(llm)
+    
+    # Agent ko task aur file ka code do
+    result = understand_agent.invoke({
+        "task": state["task"],
+        "file_contents": state["code"]
+    })
+    
+    # Uske banaye hue plan ko 'analysis' mein save kar do
+    state["analysis"] = result.content
+    return state
+
 def debug_node(state):
     # 1. Debug Agent banaya
     debug_agent = create_debug_agent(llm)
@@ -60,8 +74,6 @@ def debug_node(state):
     state["debug_result"] = result.content
     
     return state
-
-
 
 # conditional decision -- pass -- end    fail -- coding agent 
 def check_result(state):
@@ -81,10 +93,14 @@ graph = StateGraph(AgentState)
 graph.add_node("coding", coding_node)
 graph.add_node("testing", testing_node)
 graph.add_node("debug" , debug_node )
+graph.add_node("understand", understand_node)
 
-graph.add_edge(START, "coding")
+graph.add_edge(START, "understand")
+graph.add_edge("understand", "coding")
+
 graph.add_edge("coding", "testing")
-graph.add_conditional_edges( "testing", check_result, {"fix": "coding", "done": END } )
+graph.add_conditional_edges( "testing", check_result, {"fix": "debug", "done": END } )
+graph.add_edge("debug", "coding")
 
 app = graph.compile()
 
