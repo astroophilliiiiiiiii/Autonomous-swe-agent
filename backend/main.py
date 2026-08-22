@@ -50,7 +50,8 @@ initial_state = {
     "code": file_contents[relevant_files[0]], # !! -- only one file content abhi ke liye !!
     "analysis": result1.content, # by the understand agent -- like problem , error 
     "test_result": "",
-    "attempts": 0
+    "attempts": 0,
+    "debug_result": ""
 }
 result = app.invoke(initial_state)
 print(result["test_result"])
