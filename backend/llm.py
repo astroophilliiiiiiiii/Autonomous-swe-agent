@@ -3,5 +3,4 @@ from langchain_groq import ChatGroq
 
 load_dotenv() # loads all dotenv variables 
 
-llm = ChatGroq( model="llama-3.1-8b-instant") # model created 
-
+llm = ChatGroq( model="openai/gpt-oss-120b") # model created llama-3.3-70b-versatile

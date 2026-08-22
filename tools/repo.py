@@ -4,12 +4,13 @@ from pathlib import Path
 # GITHUB REPO -- clone function of the github repo 
 def clone_repo(repo_url: str, repo_path: str = "workspace/repo"): # input -- repo url , path where to clone
     path = Path(repo_path)     # string address -----> Python's proper path object
+    # to work with files and folders easily 
 
 # If workspace/repo already exists means repo already cloned --- assuming we r dealing with only 1 type of repo
     #⏳TASK-- dealing with multiple repos ---- this one doesnt deals 
     if path.exists():
         print("Repository already exists.")
-        return path
+        return path  # repo jahan clone hui uska path returned !!
 
     # path.parent = workspace  --- mkdir => make it 
     # parents -- a/b/c/repo --makes the parent c but a/b also doesnt exist -- so parent true makes all a/b/c
@@ -25,16 +26,24 @@ def clone_repo(repo_url: str, repo_path: str = "workspace/repo"): # input -- rep
 
 
 def list_directory(repo_path: str):
-    path = Path(repo_path)
+    path = Path(repo_path) # string path -- path object 
 
-    ignored_dirs = {".git","__pycache__","venv","node_modules"}
+    ignored_dirs = {".git","__pycache__","venv","node_modules"} # these files -- not relevant 
+    # removing extra work -- as content length will increase very much !! 
 
     files = []
 
+    # path folder ke andar ki saari files aur folders ko recursively dhundo. 🔍
+    # r-- recursively find 
     for item in path.rglob("*"):            # rglob("*") = inside repo --- all files and folders search
 
-        relative_path = item.relative_to(path)
+        relative_path = item.relative_to(path) #Full path ko repo ke relative/clean path mein convert karo.
+        # extra jaise workspace/ repo ye toh remove krdo itna ni chahiye uske andr vala bs do 
 
+# Kya relative_path ke andar koi bhi folder ignored_dirs mein hai?"
+# Example: relative_path = "venv/lib/test.py"
+# Iske parts: ["venv", "lib", "test.py"]
+# ignored_dirs: {".git", "venv", "__pycache__", "node_modules"}
         if any(part in ignored_dirs for part in relative_path.parts):
             continue
 
