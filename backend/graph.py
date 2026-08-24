@@ -6,6 +6,8 @@ from agents.testing_agent import testing_agent
 from langgraph.graph import StateGraph, START, END
 from agents.debug_agent import create_debug_agent
 from agents.understand_agent import create_understand_agent
+from tools.git_tools import create_branch
+from tools.git_tools import get_git_diff, commit_changes, push_to_github, create_pull_request
 
 class AgentState(TypedDict):
     repo_path: str      # where is repo 
@@ -16,6 +18,8 @@ class AgentState(TypedDict):
     test_result: str    #pytest result 
     attempts: int       # how many times fix try hua 
     debug_result: str
+    branch_name: str
+    summary: str        # 👈 NAYI LINE: Final report card save karne ke liye
 
 
 def coding_node(state):
@@ -45,6 +49,51 @@ def testing_node(state):
     state["test_result"] = result # saved the test_result -- incase again needed toh 
     return state
 
+def summary_node(state):
+    repo = state["repo_path"]
+    branch = state["branch_name"]
+    task = state["task"]
+    
+    # 1. 🔍 Diff Check
+    diff_changes = get_git_diff(repo)
+    
+    # 2. 💾 Commit
+    commit_msg = f"Auto-fix: {task}"
+    commit_changes(repo, commit_msg)
+    
+    # 3. 🚀 Push
+    push_to_github(repo, branch)
+    
+    # 4. 🔗 Pull Request (Yahan apna username aur repo name daal dena!)
+    pr_link = create_pull_request(
+        repo_owner="astroophilliiiiiiii",  # abhi hum apne hi project m theek krree toh destination apna hi project dediyaa 
+        repo_name="Autonomous-swe-agent",  # abhi hum apne hi project m theek krree toh destination apna hi project dediyaa 
+        branch_name=branch,
+        title=commit_msg,
+        description=f"Fixed issue automatically.\n\nChanges:\n{diff_changes}"
+    )
+    
+    # 5. 📝 Final Summary (Report Card)
+    final_summary = f"""
+    ✅ Task Completed Successfully!
+
+    🌿 Branch: {branch}
+    💾 Commit: {commit_msg}
+    🧪 Tests: PASS
+    🔗 PR Link: {pr_link if pr_link else 'Failed to create PR'}
+    """
+    
+    # State mein save kar do
+    state["summary"] = final_summary
+    print(final_summary) # Screen par bhi dikha do
+    
+    return state
+
+def branch_node(state):
+    # Branch banayega aur state mein update karega
+    branch = create_branch(state["repo_path"], "swe-agent/task-fix")
+    state["branch_name"] = branch
+    return state
 
 def understand_node(state):
     understand_agent = create_understand_agent(llm)
@@ -94,13 +143,18 @@ graph.add_node("coding", coding_node)
 graph.add_node("testing", testing_node)
 graph.add_node("debug" , debug_node )
 graph.add_node("understand", understand_node)
+graph.add_node("branch", branch_node)
+graph.add_node("summary", summary_node) # 👈 MISSING: Node register karo
 
-graph.add_edge(START, "understand")
+
+graph.add_edge(START, "branch")
+graph.add_edge("branch", "understand")
 graph.add_edge("understand", "coding")
 
 graph.add_edge("coding", "testing")
-graph.add_conditional_edges( "testing", check_result, {"fix": "debug", "done": END } )
+graph.add_conditional_edges( "testing", check_result, {"fix": "debug", "done": "summary"} )
 graph.add_edge("debug", "coding")
+graph.add_edge("summary", END) 
 
 app = graph.compile()
 

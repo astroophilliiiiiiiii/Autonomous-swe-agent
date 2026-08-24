@@ -51,26 +51,15 @@ initial_state = {
     "analysis": result1.content, # by the understand agent -- like problem , error 
     "test_result": "",
     "attempts": 0,
-    "debug_result": ""
+    "debug_result": "",
+    "branch_name": "",  
+    "summary": ""     
 }
 result = app.invoke(initial_state)
 print(result["test_result"])
 
 
 #-----------------------------------------------FINAL NEAT RESULT--------------------------------------
-print("\n--- Final Summary ---")
-
-print("Task:", task)
-
-print("\nChanged:")
-for file in relevant_files:
-    print("-", file)
-
-print("\nTests:")
-print(result["test_result"])
-
-print("\nResult:")
-if "PASS" in result["test_result"]:
-    print("Task completed successfully. ✅")
-else:
-    print("Task could not be completed successfully. ❌")
+print("\n--- Final AI Summary ---")
+# Agar test pass hua aur summary bani, toh AI wali summary print karo
+print(result.get("summary", "Task could not be completed successfully. ❌"))
