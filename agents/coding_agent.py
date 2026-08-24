@@ -1,5 +1,4 @@
-from langchain_core.prompts import ChatPromptTemplate
-
+from langchain.prompts import ChatPromptTemplate  # Fixed import for current LangChain versions
 
 def create_coding_agent(llm):
     prompt = ChatPromptTemplate.from_messages([
@@ -9,7 +8,7 @@ def create_coding_agent(llm):
                 file content. Do not explain. Do not use markdown formatting (no code blocks or backticks).
                 Only modify the provided files. Never create or invent files. 
                 Return only the updated content of the provided file.""",),
-        ( "human", """Task: {task} Problem analysis: {analysis} File contents: {file_contents} Previous Test Error Feedback (if any):
+        ("human", """Task: {task} Problem analysis: {analysis} File contents: {file_contents} Previous Test Error Feedback (if any):
         {error_feedback}""",),
     ])
 
