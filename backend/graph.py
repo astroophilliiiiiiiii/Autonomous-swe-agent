@@ -58,11 +58,16 @@ def summary_node(state):
     diff_changes = get_git_diff(repo)
     
     # 2. 💾 Commit
-    commit_msg = f"Auto-fix: {task}"
+    commit_result = commit_msg = f"Auto-fix: {task}"
     commit_changes(repo, commit_msg)
+    if not commit_result:
+        raise Exception("❌ Commit failed")
+
     
     # 3. 🚀 Push
-    push_to_github(repo, branch)
+    push_result = push_to_github(repo, branch)
+    if not push_result:
+        raise Exception("❌ Push failed")
     
     # 4. 🔗 Pull Request (Yahan apna username aur repo name daal dena!)
     pr_link = create_pull_request(
@@ -72,6 +77,8 @@ def summary_node(state):
         title=commit_msg,
         description=f"Fixed issue automatically.\n\nChanges:\n{diff_changes}"
     )
+    if not pr_link:
+        raise Exception("❌ Pull Request creation failed")
     
     # 5. 📝 Final Summary (Report Card)
     final_summary = f"""
@@ -94,6 +101,8 @@ def branch_node(state):
     branch = create_branch(state["repo_path"], "swe-agent/task-fix")
     state["branch_name"] = branch
     return state
+
+
 
 def understand_node(state):
     understand_agent = create_understand_agent(llm)
@@ -127,7 +136,7 @@ def debug_node(state):
 # conditional decision -- pass -- end    fail -- coding agent 
 def check_result(state):
 
-    if "PASS" in state["test_result"]:
+    if state["test_result"].startswith("PASS"):
         return "done"
 
     if state["attempts"] >= 3:
