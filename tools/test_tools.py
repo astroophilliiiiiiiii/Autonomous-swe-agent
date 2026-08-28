@@ -12,6 +12,7 @@ def run_tests(repo_path): # input -- repository path
     result = subprocess.run(["docker","exec","-w","/app/workspace/repo","swe-container","pytest","-v"],  #🎉
             capture_output=True, # Standard output aur error ko terminal par direct print karne ki jagah memory me hold karke result.stdout aur result.stderr me store kar leta hai.
             text=True ,    # Output raw binary bytes (b'...') me na mile, balki simple string formatted text me mile.
+            timeout=10
             )          
 
     return result
