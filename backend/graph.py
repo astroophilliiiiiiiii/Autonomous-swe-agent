@@ -8,6 +8,7 @@ from agents.debug_agent import create_debug_agent
 from agents.understand_agent import create_understand_agent
 from tools.git_tools import create_branch
 from tools.git_tools import get_git_diff, commit_changes, push_to_github, create_pull_request
+import os 
 
 class AgentState(TypedDict):
     repo_path: str      # where is repo 
@@ -36,7 +37,8 @@ def coding_node(state):
     new_code = result.content
 
     # path , code !! 
-    write_file(  state["repo_path"] + "/" + state["file"], new_code )
+    file_path = os.path.join(state["repo_path"], state["file"])
+    write_file(file_path, new_code)
 
     state["code"] = new_code
     state["attempts"] += 1
@@ -58,8 +60,8 @@ def summary_node(state):
     diff_changes = get_git_diff(repo)
     
     # 2. 💾 Commit
-    commit_result = commit_msg = f"Auto-fix: {task}"
-    commit_changes(repo, commit_msg)
+    commit_msg = f"Auto-fix: {task}"
+    commit_result = commit_changes(repo, commit_msg)
     if not commit_result:
         raise Exception("❌ Commit failed")
 
@@ -136,7 +138,7 @@ def debug_node(state):
 # conditional decision -- pass -- end    fail -- coding agent 
 def check_result(state):
 
-    if state["test_result"].startswith("PASS"):
+    if state["test_result"].startswith("TESTS PASSED"):
         return "done"
 
     if state["attempts"] >= 3:
