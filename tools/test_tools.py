@@ -44,7 +44,7 @@ def run_tests(repo_path: str) -> str:
             timeout=10
         )
         
-        output = result.stdout + "\n" + result.stderr
+        output = result.stdout + "\n" + result.stderr  # returning the output as string 
         
         if result.returncode == 0:
             return f"TESTS PASSED:\n{output}"
@@ -57,3 +57,8 @@ def run_tests(repo_path: str) -> str:
         return "TEST FAILED: Execution timed out (10s limit reached)."
     except Exception as e:
         return f"ERROR: Execution failed due to: {str(e)}"
+
+
+# Automated scripts (jaise tumhara agent) bina flags ke foreground execution use karti hain. 
+# docker run command container ko initialize karti hai, command run hone tak wait karti hai, 
+# aur exit code return karke terminate ho jati hai. -- pytest chlke container bnd hojegaaa !!! 

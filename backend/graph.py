@@ -20,6 +20,7 @@ class AgentState(TypedDict):
     attempts: int       # how many times fix try hua 
     debug_result: str
     branch_name: str
+    repo_url: str       # 👈 NAYI LINE: GitHub URL save karne ke liye
     summary: str        # 👈 NAYI LINE: Final report card save karne ke liye
 
 
@@ -73,8 +74,8 @@ def summary_node(state):
     
     # 4. 🔗 Pull Request (Yahan apna username aur repo name daal dena!)
     pr_link = create_pull_request(
-        repo_owner="astroophilliiiiiiii",  # abhi hum apne hi project m theek krree toh destination apna hi project dediyaa 
-        repo_name="Autonomous-swe-agent",  # abhi hum apne hi project m theek krree toh destination apna hi project dediyaa 
+        repo_owner="astroophilliiiiiiiii",  # abhi hum apne hi project m theek krree toh destination apna hi project dediyaa 
+        repo_name="simple_calculator",  # abhi hum apne hi project m theek krree toh destination apna hi project dediyaa 
         branch_name=branch,
         title=commit_msg,
         description=f"Fixed issue automatically.\n\nChanges:\n{diff_changes}"

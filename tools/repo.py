@@ -3,6 +3,7 @@ from pathlib import Path
 
 # GITHUB REPO -- clone function of the github repo 
 def clone_repo(repo_url: str, repo_path: str = "workspace/repo"): # input -- repo url , path where to clone
+    repo_url = repo_url.strip()   # to remove trailing and leading spaces 
     path = Path(repo_path)     # string address -----> Python's proper path object
     # to work with files and folders easily 
 
