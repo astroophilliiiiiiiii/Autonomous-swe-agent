@@ -121,20 +121,21 @@ def create_pull_request(repo_owner: str, repo_name: str, branch_name: str, title
     if not token:
         print("❌ Error: GITHUB_TOKEN environment variable mein nahi mila!")
         return ""
-        
-    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls" #KIS REPO mein PR banana hai?
+
+    # Mujhe is repository mein PR create karna hai
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls"  # /pulls -- pr ke related kaam - ispe request -- pr creates 
     
-    headers = {
+    headers = {  # request is authorised , its response jis format mein chahiyeee 
         "Authorization": f"Bearer {token}", #Ye request authorized user ki hai, ye raha uska token.” 🔐
         "Accept": "application/vnd.github.v3+json" # RESPONSE kis format mein chahiye? 📦
     }
 
     # 🔍 Target repo ki default branch dynamically check karna (main/master)
-    repo_info_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
-    repo_res = requests.get(repo_info_url, headers=headers)
+    repo_info_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"  #👉 Target repository ka API URL bana rahe ho.
+    repo_res = requests.get(repo_info_url, headers=headers)                   #"Is repo ki information do."
     default_branch = "main"
-    if repo_res.status_code == 200:
-        default_branch = repo_res.json().get("default_branch", "main")
+    if repo_res.status_code == 200:         # agr sahi se aaya hai response from the repo of user 
+        default_branch = repo_res.json().get("default_branch", "main")   #GitHub ke response se actual default branch nikaalo.
     
     # PR ki details
     data = {
@@ -158,3 +159,116 @@ def create_pull_request(repo_owner: str, repo_name: str, branch_name: str, title
     except Exception as e:
         print(f"❌ Exception occurred: {e}")
         return ""
+
+
+
+def check_pr_ci_status(repo_owner: str, repo_name: str, pr_number: int ) -> str:
+    """
+    Checks the CI/CD status of a Pull Request on GitHub.
+    Returns 'pending', 'success', or 'failure'.
+    """
+
+    token = os.getenv("GITHUB_TOKEN")  # for identifying that a authorised github user is creating a PR 
+    if not token:
+            print("❌ Error: GITHUB_TOKEN environment variable mein nahi mila!")
+            return ""
+
+    headers = {
+        "Authorization": f"token {token}", #Ye request authorized user ki hai, ye raha uska token.” 🔐
+        "Accept": "application/vnd.github.v3+json"   # RESPONSE kis format mein chahiye -- JSON 📦
+    }
+    
+    # 1. PR ki details API se fetch karke uska latest commit SHA nikalo
+    pr_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_number}"   # apui url of commit 
+    pr_response = requests.get(pr_url, headers=headers) # uspe get request lgaake data fetched 
+    
+    if pr_response.status_code != 200:
+        return f"Error API Call 1: {pr_response.status_code} - {pr_response.text}"
+
+    # us data mein se latest commit kaa id( SHA ) fetch 
+    # github ka reponse json meni -- pr ka head info ( meri changes vaali branch ) -- us branch ke latest commit ki unique id 
+    commit_sha = pr_response.json().get("head", {}).get("sha")
+    if not commit_sha:
+        return "Error: Commit SHA nahi mila."  
+
+    # 2. Us commit par chalne wale saare 'Check Runs' (GitHub Actions) ka status check karo
+    checks_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits/{commit_sha}/check-runs"
+    checks_response = requests.get(checks_url, headers=headers)
+    
+    if checks_response.status_code != 200:
+        return f"Error API Call 2: {checks_response.status_code} - {checks_response.text}"
+        
+    check_runs = checks_response.json().get("check_runs", []) #.get("check_runs", []) → us response se saare check runs nikaalo , agr ni hai toh [] dedo 
+    
+    # Agar abhi tak koi test trigger hi nahi hua
+    if not check_runs:
+        return "pending" 
+        
+    # 3. Status logic: Pass, Fail, ya Pending
+    for run in check_runs:
+        if run["status"] != "completed":
+            return "pending"  # Test abhi chal raha hai
+        
+        # Agar complete hua hai par fail ho gaya
+        if run["conclusion"] in ["failure", "timed_out", "action_required", "cancelled"]:
+            return "failure"  # ❌ Fail ho gaya!
+            
+    # Agar saare tests complete ho gaye aur fail nahi hue
+    return "success"      # ✅ Pass ho gaya!
+
+
+
+def get_failed_ci_logs(repo_owner: str, repo_name: str, pr_number: int ) -> str:
+    """
+    Fetches the raw error logs from a failed GitHub Action job for a specific PR.
+    Returns the last 150 lines of the log so the LLM doesn't get overwhelmed.
+    """
+
+    token = os.getenv("GITHUB_TOKEN")  # for identifying that a authorised github user is creating a PR 
+    if not token:
+        print("❌ Error: GITHUB_TOKEN environment variable mein nahi mila!")
+        return ""
+    
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    # 1. PR se latest commit SHA nikalo
+    pr_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_number}"
+    pr_response = requests.get(pr_url, headers=headers)
+    
+    if pr_response.status_code != 200:
+        return "Error: Cannot fetch PR details."
+        
+    commit_sha = pr_response.json().get("head", {}).get("sha")  # us pr ka latest commit nikaal liyyaa 
+
+    # 2. Check Runs API se pata karo kaunsi job fail hui hai
+    checks_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits/{commit_sha}/check-runs" # uske ci checks nikaalo
+    checks_response = requests.get(checks_url, headers=headers)   # Is commit par jo Ci checks chale, unka result mujhe do
+    check_runs = checks_response.json().get("check_runs", [])     # usme se check_runs nikaal specifically
+    
+    failed_job_id = None
+    for run in check_runs:
+        if run["conclusion"] in ["failure", "timed_out", "action_required"]:
+            failed_job_id = run["id"]
+            break  # Pehli failed job milte hi loop rok do
+            
+    if not failed_job_id:
+        return "No failed jobs found. Everything seems fine."
+
+    # 3. Failed job ke raw logs download karo
+    logs_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/actions/jobs/{failed_job_id}/logs" # url bnao for the failed job
+    logs_response = requests.get(logs_url, headers=headers)     # uskaa response nikaaloo 
+    
+    if logs_response.status_code == 200:
+        full_logs = logs_response.text
+        # LLM token limit bachaane ke liye sirf aakhiri 150 lines return karenge
+        # Kyunki pytest ke actual errors hamesha end mein aate hain!
+        log_lines = full_logs.splitlines()
+        tail_logs = "\n".join(log_lines[-150:])
+        
+        return f"--- FAILED CI LOGS ---\n{tail_logs}"
+    else:
+        return f"Error fetching logs: {logs_response.status_code} - {logs_response.text}"
