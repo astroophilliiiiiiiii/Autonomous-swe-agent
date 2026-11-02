@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 
-load_dotenv() # loads all dotenv variables 
+# Load environment variables from .env file
+load_dotenv()
 
-llm = ChatGroq( model="openai/gpt-oss-120b") # model created llama-3.3-70b-versatile
+# Active model configured for Groq
+llm = ChatGroq(model="openai/gpt-oss-120b")

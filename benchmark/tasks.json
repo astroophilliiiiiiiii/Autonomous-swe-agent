@@ -1,0 +1,73 @@
+[
+  {
+    "id": "calc-01-factorial",
+    "repo": "https://github.com/astroophilliiiiiiiii/simple_calculator.git",
+    "name": "Add Factorial Method",
+    "category": "Feature Addition",
+    "task": "Add a factorial method factorial(self, n) to SimpleCalculator in simple_calculator/main.py.\n\nRequirements:\n- Return the factorial for non-negative integers.\n- Handle 0 and 1 correctly.\n- Reject negative numbers gracefully.\n- Reject non-integer inputs gracefully.\n- Avoid application crashes.\n- Add unit tests for normal cases and edge cases.\n- Preserve all existing functionality.\n- Run the complete test suite and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "calc-02-square",
+    "repo": "https://github.com/astroophilliiiiiiiii/simple_calculator.git",
+    "name": "Add Square Method",
+    "category": "Feature Addition",
+    "task": "Add a method square(self, n) to SimpleCalculator in simple_calculator/main.py.\n\nRequirements:\n- Return the square of the given number.\n- Support positive, negative, zero, and decimal numbers.\n- Reject invalid inputs gracefully.\n- Add unit tests covering normal cases and edge cases.\n- Preserve all existing functionality.\n- Run the complete test suite and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "calc-03-power",
+    "repo": "https://github.com/astroophilliiiiiiiii/simple_calculator.git",
+    "name": "Add Power Method",
+    "category": "Feature Addition",
+    "task": "Add a method power(self, base, exponent) to SimpleCalculator in simple_calculator/main.py.\n\nRequirements:\n- Return base raised to the power of exponent.\n- Support positive, negative, and zero exponents.\n- Handle fractional powers (e.g., base=4, exponent=0.5 -> 2.0).\n- Reject invalid non-numeric inputs gracefully with ValueError.\n- Add comprehensive unit tests in tests/.\n- Run the complete test suite and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "calc-04-percentage",
+    "repo": "https://github.com/astroophilliiiiiiiii/simple_calculator.git",
+    "name": "Add Percentage Method",
+    "category": "Feature Addition",
+    "task": "Add a method percentage(self, part, total) to SimpleCalculator in simple_calculator/main.py.\n\nRequirements:\n- Return (part / total) * 100.\n- Handle total == 0 by returning None or raising ZeroDivisionError gracefully.\n- Support floats and integers.\n- Add unit tests covering normal and zero total cases.\n- Run the complete test suite and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "calc-05-regression",
+    "repo": "https://github.com/astroophilliiiiiiiii/simple_calculator.git",
+    "name": "Regression Review",
+    "category": "Regression Testing",
+    "task": "Review the entire SimpleCalculator project for regressions.\n\nRequirements:\n- Verify all existing calculator methods still work correctly.\n- Check interactions between existing and newly added methods.\n- Identify any duplicate or conflicting implementations.\n- Add regression tests wherever necessary.\n- Run the complete test suite.\n- Fix any failures without breaking existing functionality.\n- Commit, push, and create a GitHub PR only if changes are needed."
+  },
+  {
+    "id": "fastapi-01-input-validation",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-python-fastapi-inventory-api.git",
+    "name": "Inventory Item Input Validation",
+    "category": "Input Validation",
+    "task": "Add input validation to the inventory item creation endpoint.\n\n1. Reject empty or whitespace-only item names.\n2. Reject negative quantities.\n3. Return HTTP 422 for invalid inputs.\n4. Add pytest tests for valid and invalid inputs.\n5. Preserve existing API behaviour.\n6. Run all tests and fix failures.\n7. Create a GitHub PR only if all tests pass.\n\nDo not modify unrelated files."
+  },
+  {
+    "id": "fastapi-02-pagination",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-python-fastapi-inventory-api.git",
+    "name": "Item Listing Pagination",
+    "category": "Feature Addition",
+    "task": "Add pagination support to the GET /items endpoint.\n\n1. Accept optional query parameters 'limit' (default 10, max 100, ge 1) and 'offset' (default 0, ge 0).\n2. Apply slicing to the returned item list.\n3. Reject invalid query parameters with HTTP 422.\n4. Add unit tests in tests/ for default pagination, custom limit/offset, and boundary values.\n5. Ensure all existing tests continue to pass.\n6. Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "fastapi-03-search-endpoint",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-python-fastapi-inventory-api.git",
+    "name": "Item Search by Keyword",
+    "category": "Feature Addition",
+    "task": "Add a search feature to GET /items.\n\n1. Accept an optional query parameter 'q' (case-insensitive substring match against item name or description).\n2. If provided, only return items where 'q' appears in the name or description.\n3. Maintain compatibility with existing category filter.\n4. Add unit tests for matching query, non-matching query, and empty query.\n5. Run all tests and ensure 100% pass rate.\n6. Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "flask-01-helper",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-flask.git",
+    "name": "Add JSON Response Helper",
+    "category": "Feature Addition",
+    "task": "Add a helper function format_api_response(data, status_code=200, message='OK') to src/flask/helpers.py.\n\nRequirements:\n- Return a dictionary with keys: 'data', 'status', and 'message'.\n- Support dict, list, string, or None for data.\n- Add unit tests in tests/test_api_response_helper.py covering success, custom status codes, and error messages.\n- Run pytest and ensure all tests pass.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "requests-01-status",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--requests.git",
+    "name": "Add Status Code Validator",
+    "category": "Feature Addition",
+    "task": "Add a helper function is_successful_status(code: int) -> bool to src/requests/status_codes.py.\n\nRequirements:\n- Return True if code is an integer between 200 and 299 inclusive, False otherwise.\n- Handle non-integer inputs gracefully by returning False.\n- Add unit tests in tests/test_status_helper.py covering 200, 201, 204, 400, 500, and non-integer edge cases.\n- Run pytest and ensure all tests pass.\n- Commit, push, and create a GitHub PR."
+  }
+]
+

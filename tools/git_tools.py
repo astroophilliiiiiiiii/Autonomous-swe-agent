@@ -2,28 +2,26 @@ import os
 import subprocess
 import requests
 
-# Is code me sabse badi dikkat ye thi ki jab swe-agent/task-fix branch pehle se exist karti thi, 
-# toh checkout -b command error de kar except block me chali jaati thi aur return None kar deti thi. 
-# Phir summary_node ko branch name None milta tha, jiski wajah se git push command crash ho jaati thi.
-# Sahi tarika ye hai ki agar branch pehle se bani hui hai, toh hum error throw karne ke bajaye 
-# simply us existing branch par switch (git checkout branch_name) kar lein.
-
 def create_branch(repo_path: str, branch_name: str = "swe-agent/task-fix"):
+    """
+    Creates a new branch or switches to an existing branch.
+    If the branch already exists, it checks out the existing branch cleanly.
+    """
     try:
-        # 1. Nayi branch make and switch to it  (git checkout -b <branch_name>)
+        # 1. Create and switch to new branch (git checkout -b <branch_name>)
         subprocess.run(
             ["git", "checkout", "-b", branch_name],
-            cwd=repo_path,         # Command repo_path folder ke andar chalegi
-            check=True,            # Error aane par CalledProcessError raise karega
-            capture_output=True,   # Output/error ko print karne ki jagah memory mein capture karega
-            text=True,             # Output ko string format mein rakhega (bytes mein nahi)
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True,
             encoding="utf-8",
             errors="replace"
         )
         print(f"🌿 Branch '{branch_name}' created successfully.")
 
     except subprocess.CalledProcessError:
-        # 2. if branch exists pehle se (checkout -b fail hua), toh directly switch karo
+        # 2. If branch already exists (checkout -b fails), switch directly to it
         subprocess.run(
             ["git", "checkout", branch_name],
             cwd=repo_path,
@@ -35,16 +33,14 @@ def create_branch(repo_path: str, branch_name: str = "swe-agent/task-fix"):
         )
         print(f"🔄 Switched to existing branch '{branch_name}'.")
 
-    # 3. Always branch_name return ( None return kabhi nahi hoga!)
     return branch_name
 
 
 def get_git_diff(repo_path: str) -> str:
-    """Dekhta hai ki code mein exactly kya-kya add ya remove hua hai."""
+    """Returns the unstaged and staged git diff against HEAD."""
     try:
-        # Terminal command: git diff
         result = subprocess.run(
-            ["git", "diff"],
+            ["git", "diff", "HEAD"],
             cwd=repo_path,
             capture_output=True,
             text=True,
@@ -52,28 +48,35 @@ def get_git_diff(repo_path: str) -> str:
             encoding="utf-8",
             errors="replace"
         )
-        if result and result.stdout:
-            return result.stdout.strip() # Terminal se nikle hue raw text output ko clean karke ek normal readable string banana! 🧹
-        return ""
-        
+        return result.stdout.strip()
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error checking diff: {e.stderr}")
         return ""
 
 
 def commit_changes(repo_path: str, commit_message: str = "Agent auto-fix"):
-    """Saare changes ko Git mein add aur commit karta hai."""
+    """Stages tracked modifications and creates a git commit."""
     try:
-        # Step 1: git add . (Saare changes select karo)
+        # Step 1: Stage all modified tracked files
         subprocess.run(
-            ["git", "add", "."], 
-            cwd=repo_path, 
+            ["git", "add", "-u"],
+            cwd=repo_path,
             check=True,
             encoding="utf-8",
             errors="replace"
-        ) # koi error aaya toh save krlena
-        
-        # Step 2: git commit (Message ke saath save karo)
+        )
+
+        # Step 2: Also stage any new files that were created
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=repo_path,
+            check=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+
+        # Step 3: Create git commit with message
         subprocess.run(
             ["git", "commit", "-m", commit_message],
             cwd=repo_path,
@@ -85,18 +88,29 @@ def commit_changes(repo_path: str, commit_message: str = "Agent auto-fix"):
         )
         print(f"💾 Changes successfully committed: '{commit_message}'")
         return True
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error committing changes: {e.stderr}")
         return False
 
 
 def push_to_github(repo_path: str, branch_name: str) -> bool:
-    """Nayi branch aur uske changes ko GitHub par upload karta hai."""
+    """Pushes the branch and its commits to remote GitHub repository."""
     try:
-        # Terminal command: git push origin branch_name
+        token = os.getenv("GITHUB_TOKEN")
+        remote_target = "origin"
+        if token:
+            res = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                cwd=repo_path, capture_output=True, text=True
+            )
+            raw_url = res.stdout.strip()
+            if "github.com" in raw_url:
+                clean = raw_url.split("@")[-1].replace("https://", "").replace("http://", "")
+                remote_target = f"https://x-access-token:{token}@{clean}"
+
         subprocess.run(
-            ["git", "push", "origin", branch_name,"--force-with-lease"], # origin -- repo name , branch_name-- new branch created 
+            ["git", "push", "-u", remote_target, branch_name],
             cwd=repo_path,
             check=True,
             capture_output=True,
@@ -106,169 +120,182 @@ def push_to_github(repo_path: str, branch_name: str) -> bool:
         )
         print(f"🚀 Successfully pushed '{branch_name}' to GitHub!")
         return True
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Error pushing to GitHub: {e.stderr}")
         return False
 
 
 def create_pull_request(repo_owner: str, repo_name: str, branch_name: str, title: str, description: str) -> str:
-    """GitHub API se automatic Pull Request (PR) banata hai."""
-    
-    # GitHub ko pata hona chahiye: "Ye request kis authorized user ki hai?"
-    # identification + authentication/authorization
-    token = os.getenv("GITHUB_TOKEN")  # for identifying that a authorised github user is creating a PR 
+    """Creates a Pull Request on GitHub for the specified branch."""
+    token = os.getenv("GITHUB_TOKEN")
     if not token:
-        print("❌ Error: GITHUB_TOKEN environment variable mein nahi mila!")
+        print("❌ GITHUB_TOKEN missing!")
         return ""
-
-    # Mujhe is repository mein PR create karna hai
-    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls"  # /pulls -- pr ke related kaam - ispe request -- pr creates 
-    
-    headers = {  # request is authorised , its response jis format mein chahiyeee 
-        "Authorization": f"Bearer {token}", #Ye request authorized user ki hai, ye raha uska token.” 🔐
-        "Accept": "application/vnd.github.v3+json" # RESPONSE kis format mein chahiye? 📦
-    }
-
-    # 🔍 Target repo ki default branch dynamically check karna (main/master)
-    repo_info_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"  #👉 Target repository ka API URL bana rahe ho.
-    repo_res = requests.get(repo_info_url, headers=headers)                   #"Is repo ki information do."
-    default_branch = "main"
-    if repo_res.status_code == 200:         # agr sahi se aaya hai response from the repo of user 
-        default_branch = repo_res.json().get("default_branch", "main")   #GitHub ke response se actual default branch nikaalo.
-    
-    # PR ki details
-    data = {
-        "title": title,       # PR ka naam/title kya hoga.
-        "body": description,  #PR mein explanation/description kya hogi.
-        "head": branch_name,  # Kis branch se changes aa rahe hain
-        "base": default_branch        # Kis branch mein changes bhejne hain
-    }
-    
-    try:
-        # GitHub, meri feature branch se main ke liye PR bana do
-        response = requests.post(url, headers=headers, json=data) #Ye GitHub API ko POST request bhej raha hai.
-        if response.status_code == 201: # 201 matlab "Created"
-            pr_url = response.json().get("html_url") # PR ka actual GitHub link.
-            print(f"🔗 Pull Request Created Successfully: {pr_url}")
-            return pr_url
-        else:
-            print(f"❌ Failed to create PR: {response.text}")
-            return ""
-            
-    except Exception as e:
-        print(f"❌ Exception occurred: {e}")
-        return ""
-
-
-
-def check_pr_ci_status(repo_owner: str, repo_name: str, pr_number: int ) -> str:
-    """
-    Checks the CI/CD status of a Pull Request on GitHub.
-    Returns 'pending', 'success', or 'failure'.
-    """
-
-    token = os.getenv("GITHUB_TOKEN")  # for identifying that a authorised github user is creating a PR 
-    if not token:
-            print("❌ Error: GITHUB_TOKEN environment variable mein nahi mila!")
-            return ""
 
     headers = {
-        "Authorization": f"token {token}", #Ye request authorized user ki hai, ye raha uska token.” 🔐
-        "Accept": "application/vnd.github.v3+json"   # RESPONSE kis format mein chahiye -- JSON 📦
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
     }
-    
-    # 1. PR ki details API se fetch karke uska latest commit SHA nikalo
-    pr_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_number}"   # apui url of commit 
-    pr_response = requests.get(pr_url, headers=headers) # uspe get request lgaake data fetched 
-    
-    if pr_response.status_code != 200:
-        return f"Error API Call 1: {pr_response.status_code} - {pr_response.text}"
 
-    # us data mein se latest commit kaa id( SHA ) fetch 
-    # github ka reponse json meni -- pr ka head info ( meri changes vaali branch ) -- us branch ke latest commit ki unique id 
-    commit_sha = pr_response.json().get("head", {}).get("sha")
-    if not commit_sha:
-        return "Error: Commit SHA nahi mila."  
+    base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
 
-    # 2. Us commit par chalne wale saare 'Check Runs' (GitHub Actions) ka status check karo
-    checks_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits/{commit_sha}/check-runs"
-    checks_response = requests.get(checks_url, headers=headers)
-    
-    if checks_response.status_code != 200:
-        return f"Error API Call 2: {checks_response.status_code} - {checks_response.text}"
-        
-    check_runs = checks_response.json().get("check_runs", []) #.get("check_runs", []) → us response se saare check runs nikaalo , agr ni hai toh [] dedo 
-    
-    # Agar abhi tak koi test trigger hi nahi hua
-    if not check_runs:
-        return "pending" 
-        
-    # 3. Status logic: Pass, Fail, ya Pending
-    for run in check_runs:
-        if run["status"] != "completed":
-            return "pending"  # Test abhi chal raha hai
-        
-        # Agar complete hua hai par fail ho gaya
-        if run["conclusion"] in ["failure", "timed_out", "action_required", "cancelled"]:
-            return "failure"  # ❌ Fail ho gaya!
-            
-    # Agar saare tests complete ho gaye aur fail nahi hue
-    return "success"      # ✅ Pass ho gaya!
+    try:
+        # Check repository's default branch
+        repo_res = requests.get(base_url, headers=headers, timeout=30)
+        repo_res.raise_for_status()
+        default_branch = repo_res.json().get("default_branch", "main")
 
+        # Check whether an open PR already exists for this branch
+        response = requests.get(
+            f"{base_url}/pulls",
+            headers=headers,
+            params={
+                "head": f"{repo_owner}:{branch_name}",
+                "base": default_branch,
+                "state": "open"
+            },
+            timeout=30
+        )
+        response.raise_for_status()
+        existing_prs = response.json()
 
+        if existing_prs:
+            pr_url = existing_prs[0]["html_url"]
+            print(f"🔄 Existing PR found: {pr_url}")
+            return pr_url
 
-def get_failed_ci_logs(repo_owner: str, repo_name: str, pr_number: int ) -> str:
-    """
-    Fetches the raw error logs from a failed GitHub Action job for a specific PR.
-    Returns the last 150 lines of the log so the LLM doesn't get overwhelmed.
-    """
+        # Create PR only if no open PR exists
+        response = requests.post(
+            f"{base_url}/pulls",
+            headers=headers,
+            json={
+                "title": title,
+                "body": description,
+                "head": branch_name,
+                "base": default_branch
+            },
+            timeout=30
+        )
 
-    token = os.getenv("GITHUB_TOKEN")  # for identifying that a authorised github user is creating a PR 
-    if not token:
-        print("❌ Error: GITHUB_TOKEN environment variable mein nahi mila!")
+        response.raise_for_status()
+        pr_url = response.json()["html_url"]
+        print(f"✅ PR created: {pr_url}")
+        return pr_url
+
+    except requests.RequestException as e:
+        print(f"❌ GitHub PR error: {e}")
         return ""
-    
+
+
+def check_pr_ci_status(repo_owner, repo_name, pr_number):
+    """Checks the status of GitHub Actions check-runs on the PR commit."""
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        print("❌ GITHUB_TOKEN missing!")
+        return "error"
 
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
-    
-    # 1. PR se latest commit SHA nikalo
-    pr_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_number}"
-    pr_response = requests.get(pr_url, headers=headers)
-    
-    if pr_response.status_code != 200:
-        return "Error: Cannot fetch PR details."
-        
-    commit_sha = pr_response.json().get("head", {}).get("sha")  # us pr ka latest commit nikaal liyyaa 
 
-    # 2. Check Runs API se pata karo kaunsi job fail hui hai
-    checks_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits/{commit_sha}/check-runs" # uske ci checks nikaalo
-    checks_response = requests.get(checks_url, headers=headers)   # Is commit par jo Ci checks chale, unka result mujhe do
-    check_runs = checks_response.json().get("check_runs", [])     # usme se check_runs nikaal specifically
-    
-    failed_job_id = None
-    for run in check_runs:
-        if run["conclusion"] in ["failure", "timed_out", "action_required"]:
-            failed_job_id = run["id"]
-            break  # Pehli failed job milte hi loop rok do
-            
-    if not failed_job_id:
-        return "No failed jobs found. Everything seems fine."
+    try:
+        pr_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_number}"
+        pr_response = requests.get(pr_url, headers=headers, timeout=10)
 
-    # 3. Failed job ke raw logs download karo
-    logs_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/actions/jobs/{failed_job_id}/logs" # url bnao for the failed job
-    logs_response = requests.get(logs_url, headers=headers)     # uskaa response nikaaloo 
-    
-    if logs_response.status_code == 200:
-        full_logs = logs_response.text
-        # LLM token limit bachaane ke liye sirf aakhiri 150 lines return karenge
-        # Kyunki pytest ke actual errors hamesha end mein aate hain!
-        log_lines = full_logs.splitlines()
-        tail_logs = "\n".join(log_lines[-150:])
-        
-        return f"--- FAILED CI LOGS ---\n{tail_logs}"
-    else:
-        return f"Error fetching logs: {logs_response.status_code} - {logs_response.text}"
+        if pr_response.status_code != 200:
+            print(f"❌ GitHub PR API error: {pr_response.status_code}")
+            return "error"
+
+        commit_sha = pr_response.json().get("head", {}).get("sha")
+        if not commit_sha:
+            return "error"
+
+        checks_url = (
+            f"https://api.github.com/repos/{repo_owner}/{repo_name}"
+            f"/commits/{commit_sha}/check-runs"
+        )
+        checks_response = requests.get(
+            checks_url, headers=headers, timeout=10
+        )
+
+        if checks_response.status_code != 200:
+            print(f"❌ GitHub Checks API error: {checks_response.status_code}")
+            return "error"
+
+        check_runs = checks_response.json().get("check_runs", [])
+
+        if not check_runs:
+            return "no_ci"
+
+        for run in check_runs:
+            if run["status"] != "completed":
+                return "pending"
+            if run.get("conclusion") in [
+                "failure", "timed_out", "action_required", "cancelled"
+            ]:
+                return "failure"
+
+        return "success"
+
+    except requests.RequestException as e:
+        print(f"❌ GitHub network error: {e}")
+        return "error"
+
+
+def get_failed_ci_logs(repo_owner: str, repo_name: str, pr_number: int) -> str:
+    """Fetches log output from the first failed GitHub Actions check run."""
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        return "ERROR: GITHUB_TOKEN missing."
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
+    base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
+
+    try:
+        pr_response = requests.get(
+            f"{base_url}/pulls/{pr_number}",
+            headers=headers, timeout=10
+        )
+        pr_response.raise_for_status()
+
+        commit_sha = pr_response.json().get("head", {}).get("sha")
+        if not commit_sha:
+            return "ERROR: PR commit SHA missing."
+
+        checks_response = requests.get(
+            f"{base_url}/commits/{commit_sha}/check-runs",
+            headers=headers, timeout=10
+        )
+        checks_response.raise_for_status()
+
+        check_runs = checks_response.json().get("check_runs", [])
+        failed_job_id = next(
+            (
+                run["id"] for run in check_runs
+                if run.get("status") == "completed"
+                and run.get("conclusion") in [
+                    "failure", "timed_out", "action_required"
+                ]
+            ),
+            None
+        )
+
+        if not failed_job_id:
+            return "No failed jobs found."
+
+        logs_response = requests.get(
+            f"{base_url}/actions/jobs/{failed_job_id}/logs",
+            headers=headers, timeout=20
+        )
+        logs_response.raise_for_status()
+
+        logs = "\n".join(logs_response.text.splitlines()[-50:])
+        return f"--- FAILED CI LOGS ---\n{logs[-2500:]}"
+
+    except (requests.RequestException, ValueError, KeyError) as e:
+        return f"ERROR: Could not fetch CI logs: {e}"
