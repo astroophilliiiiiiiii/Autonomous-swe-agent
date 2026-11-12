@@ -56,6 +56,27 @@
     "task": "Add a search feature to GET /items.\n\n1. Accept an optional query parameter 'q' (case-insensitive substring match against item name or description).\n2. If provided, only return items where 'q' appears in the name or description.\n3. Maintain compatibility with existing category filter.\n4. Add unit tests for matching query, non-matching query, and empty query.\n5. Run all tests and ensure 100% pass rate.\n6. Commit, push, and create a GitHub PR."
   },
   {
+    "id": "fastapi-04-update-validation",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-python-fastapi-inventory-api.git",
+    "name": "Update Endpoint Validation",
+    "category": "Bug Fix",
+    "task": "Fix item update validation in PUT /items/{id} and app/schemas.py.\n\n1. Reject empty or whitespace-only item names during updates with HTTP 422.\n2. Reject negative prices or negative quantities during updates with HTTP 422.\n3. Preserve partial update behaviour when valid fields are provided.\n4. Add pytest unit tests in tests/test_update_validation.py covering invalid and valid partial updates.\n5. Run the complete pytest suite and fix any failures.\n6. Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "fastapi-05-sort-items",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-python-fastapi-inventory-api.git",
+    "name": "Item Listing Sorting",
+    "category": "Feature Addition",
+    "task": "Add sorting support to the GET /items endpoint.\n\n1. Accept optional query parameters 'sort_by' (allowed: 'id', 'name', 'price', 'quantity', default 'id') and 'order' (allowed: 'asc', 'desc', default 'asc').\n2. Return HTTP 422 if an invalid sort_by or order value is provided.\n3. Maintain compatibility with existing category filtering.\n4. Add pytest unit tests in tests/test_items_sort.py for ascending/descending sorting and invalid query values.\n5. Run the complete pytest suite and fix any failures.\n6. Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "fastapi-06-inventory-stats",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-python-fastapi-inventory-api.git",
+    "name": "Inventory Summary Stats Endpoint",
+    "category": "Feature Addition",
+    "task": "Add a GET /items/stats endpoint to summarize inventory.\n\n1. Return JSON with 'total_items' (count of distinct items), 'total_quantity' (sum of quantities), and 'total_value' (sum of quantity * price rounded to 2 decimal places).\n2. Ensure GET /items/stats is registered before GET /items/{item_id} in app/routers/items.py so FastAPI does not treat 'stats' as an integer ID.\n3. Handle empty inventory gracefully (all zeros).\n4. Add pytest unit tests in tests/test_items_stats.py.\n5. Run the complete pytest suite and fix any failures.\n6. Commit, push, and create a GitHub PR."
+  },
+  {
     "id": "flask-01-helper",
     "repo": "https://github.com/astroophilliiiiiiiii/testing-flask.git",
     "name": "Add JSON Response Helper",
@@ -63,11 +84,60 @@
     "task": "Add a helper function format_api_response(data, status_code=200, message='OK') to src/flask/helpers.py.\n\nRequirements:\n- Return a dictionary with keys: 'data', 'status', and 'message'.\n- Support dict, list, string, or None for data.\n- Add unit tests in tests/test_api_response_helper.py covering success, custom status codes, and error messages.\n- Run pytest and ensure all tests pass.\n- Commit, push, and create a GitHub PR."
   },
   {
+    "id": "flask-02-error-helper",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing-flask.git",
+    "name": "Add Error Payload Helper",
+    "category": "Feature Addition",
+    "task": "Add a helper function format_error_response(error, status_code=400, details=None) to src/flask/helpers.py.\n\nRequirements:\n- Return a dictionary with keys: 'error' (str(error)), 'status' (int status_code), and 'details' (details).\n- Preserve all existing functions in src/flask/helpers.py.\n- Add unit tests in tests/test_error_response_helper.py covering default status_code=400, custom status codes (e.g. 404, 500), and details dict/None.\n- Run pytest on tests/test_error_response_helper.py and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
     "id": "requests-01-status",
     "repo": "https://github.com/astroophilliiiiiiiii/testing--requests.git",
     "name": "Add Status Code Validator",
     "category": "Feature Addition",
     "task": "Add a helper function is_successful_status(code: int) -> bool to src/requests/status_codes.py.\n\nRequirements:\n- Return True if code is an integer between 200 and 299 inclusive, False otherwise.\n- Handle non-integer inputs gracefully by returning False.\n- Add unit tests in tests/test_status_helper.py covering 200, 201, 204, 400, 500, and non-integer edge cases.\n- Run pytest and ensure all tests pass.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "sympy-01-digital-root",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--sympy.git",
+    "name": "Add Digital Root Helper",
+    "category": "Feature Addition",
+    "task": "Add a function digital_root(n, b=10) to sympy/ntheory/digits.py.\n\nRequirements:\n- Repeatedly sum the base-b digits of non-negative integer n until a single digit (< b) remains and return it.\n- Validate b >= 2 and n >= 0 (raise ValueError if invalid).\n- Preserve all existing functions in sympy/ntheory/digits.py.\n- Add unit tests in sympy/ntheory/tests/test_digits.py covering 0, single digits, multi-digit numbers, base=2, and invalid inputs.\n- Run pytest on sympy/ntheory/tests/test_digits.py and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "sympy-02-distinct-digits",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--sympy.git",
+    "name": "Add Distinct Digit Count Helper",
+    "category": "Feature Addition",
+    "task": "Add a function count_distinct_digits(n, b=10) to sympy/ntheory/digits.py.\n\nRequirements:\n- Return the number of unique digits in the base-b representation of non-negative integer n.\n- Validate b >= 2 and n >= 0 (raise ValueError if invalid).\n- Preserve all existing functions in sympy/ntheory/digits.py.\n- Add unit tests in sympy/ntheory/tests/test_digits.py covering 0, repeated digits (e.g. 1111 -> 1), mixed digits (e.g. 122333 -> 3), base=2, and invalid inputs.\n- Run pytest on sympy/ntheory/tests/test_digits.py and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "django-01-duration-seconds",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--django.git",
+    "name": "Add Duration Total Seconds Helper",
+    "category": "Feature Addition",
+    "task": "Add a helper function duration_total_seconds(delta) to django/utils/duration.py.\n\nRequirements:\n- Return the total duration in seconds as a float (using duration_microseconds(delta) / 1_000_000).\n- Preserve all existing functions in django/utils/duration.py.\n- Add unit tests in tests/utils_tests/test_duration.py covering positive, zero, negative, and microsecond-precision timedeltas.\n- Run tests/utils_tests/test_duration.py and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "django-02-safestring-is-safe",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--django.git",
+    "name": "Add SafeString Check Helper",
+    "category": "Feature Addition",
+    "task": "Add a helper function is_safe(s) to django/utils/safestring.py.\n\nRequirements:\n- Return True if s is an instance of SafeData (or has an __html__ attribute), and False otherwise.\n- Preserve all existing classes and functions in django/utils/safestring.py.\n- Add unit tests in tests/utils_tests/test_safestring.py covering SafeString, mark_safe(...), plain str, and non-string objects.\n- Run tests/utils_tests/test_safestring.py and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "pytest-01-scope-helper",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--pytest.git",
+    "name": "Add Scope Validation Helper",
+    "category": "Feature Addition",
+    "task": "Add a helper function is_valid_scope(scope_name: str) -> bool to src/_pytest/scope.py.\n\nRequirements:\n- Return True if scope_name is one of the valid Scope values ('function', 'class', 'module', 'package', 'session'), and False otherwise (including non-string or invalid values).\n- Preserve all existing classes, methods, and constants in src/_pytest/scope.py.\n- Add unit tests in testing/test_scope.py covering all valid scope names and invalid inputs.\n- Run pytest on testing/test_scope.py and fix any failures.\n- Commit, push, and create a GitHub PR."
+  },
+  {
+    "id": "pytest-02-stash-pop",
+    "repo": "https://github.com/astroophilliiiiiiiii/testing--pytest.git",
+    "name": "Add Stash Pop Method",
+    "category": "Feature Addition",
+    "task": "Add a pop(self, key: StashKey[T], default: D | None = None) -> T | D | None method to Stash in src/_pytest/stash.py.\n\nRequirements:\n- Remove and return the value for key if present in self._storage; otherwise return default.\n- Preserve all existing methods and docstrings in src/_pytest/stash.py.\n- Add unit tests in testing/test_stash.py covering popping an existing key (and verifying it is removed) and popping a missing key with/without a custom default.\n- Run pytest on testing/test_stash.py and fix any failures.\n- Commit, push, and create a GitHub PR."
   }
 ]
 

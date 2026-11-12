@@ -17,14 +17,17 @@ Return ONLY valid JSON in this exact format:
   "files": [
     {{
       "path": "relative/path/to/file.py",
-      "content": "complete updated file content"
+      "content": "complete updated file content (for new or small files)"
     }}
   ]
 }}
 
+For LARGE existing files (especially those showing `[TRUNCATED ...]`):
+- Instead of `"content"`, prefer `"append": "new code to add at end of file"` or `"edits": [{{"old": "exact existing snippet", "new": "replacement snippet"}}]` so you NEVER delete existing functions/imports!
+
 Rules:
 - Include every modified file in the response.
-- Each content value must contain the COMPLETE updated file.
+- Each `"content"` value must contain the COMPLETE updated file (never omit existing functions). Use `"append"` or `"edits"` when modifying large existing files.
 - You may modify files provided in the input AND create new files (e.g. test files) when the task requires it.
 - New file paths must be relative to the repo root and must not escape it (no '..' or absolute paths).
 - Preserve unrelated code and existing functionality.

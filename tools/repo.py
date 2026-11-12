@@ -90,3 +90,43 @@ def list_directory(repo_path: str) -> list[str]:
             files.append(str(item.relative_to(path)))
 
     return files
+
+
+def filter_candidate_files(files: list[str], task: str, max_files: int = 120) -> list[str]:
+    """
+    Pre-filters repository files for large codebases so the file-selector LLM prompt
+    stays within token limits. Preserves exact path/filename matches and keyword hits.
+    """
+    if len(files) <= max_files:
+        return files
+
+    import re
+    task_lower = task.lower()
+    # Extract meaningful tokens (>= 3 chars) from the task
+    tokens = set(re.findall(r"[a-zA-Z0-9_]{3,}", task_lower))
+    stopwords = {"the", "and", "for", "with", "that", "this", "from", "into", "add", "fix", "all", "run", "test", "tests", "file", "files", "create", "commit", "push", "github", "pytest", "ensure", "pass"}
+    keywords = [t for t in tokens if t not in stopwords]
+
+    scored = []
+    for f in files:
+        norm = f.replace("\\", "/").lower()
+        score = 0
+        # Strong boost if exact relative path or basename is mentioned in task
+        basename = norm.split("/")[-1]
+        if norm in task_lower:
+            score += 100
+        elif basename in task_lower and basename not in ("__init__.py", "readme.md"):
+            score += 50
+
+        for kw in keywords:
+            if kw in norm:
+                score += 10
+
+        # Prefer Python source/test files over docs/assets
+        if norm.endswith(".py"):
+            score += 2
+        if score > 0 or norm.endswith(".py"):
+            scored.append((score, f))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [f for _, f in scored[:max_files]]

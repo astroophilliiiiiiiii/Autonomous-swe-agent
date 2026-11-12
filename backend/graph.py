@@ -8,6 +8,7 @@ if sys.platform == "win32":
 
 import os
 import re
+import ast
 import json
 import time
 import subprocess
@@ -91,7 +92,13 @@ def fetch_repo_details(state):
 
 # Run local pytest suite
 def testing_node(state):
-    result = testing_agent(state["repo_path"])
+    target_tests = []
+    for path in state.get("file_contents", {}):
+        norm = path.replace("\\", "/")
+        base = norm.split("/")[-1]
+        if base.endswith(".py") and (base.startswith("test_") or base.endswith("_test.py")):
+            target_tests.append(norm)
+    result = testing_agent(state["repo_path"], target_tests=target_tests or None)
     state["test_result"] = result
     return state
 
@@ -210,6 +217,41 @@ def branch_node(state):
     return state
 
 
+def _truncate_cleanly(content: str, max_chars: int) -> str:
+    """Truncates large file content cleanly at newline boundaries, keeping head and tail."""
+    if len(content) <= max_chars:
+        return content
+    half = max_chars // 2
+    head = content[:half]
+    last_nl = head.rfind("\n")
+    if last_nl > half // 2:
+        head = head[:last_nl]
+    tail = content[-half:]
+    first_nl = tail.find("\n")
+    if 0 <= first_nl < half // 2:
+        tail = tail[first_nl + 1:]
+    omitted = len(content) - len(head) - len(tail)
+    return f"{head}\n\n# ... [TRUNCATED {omitted} CHARS — use 'append' or 'edits' for large files] ...\n\n{tail}"
+
+
+def _invoke_with_tpm_retry(agent, payload: dict, max_retries: int = 2):
+    """Retries LLM invocation briefly when hitting Groq's per-minute (TPM) window."""
+    for attempt in range(max_retries + 1):
+        try:
+            return agent.invoke(payload)
+        except Exception as exc:
+            msg = str(exc).lower()
+            is_tpm = ("tokens per minute" in msg or "tpm" in msg) and "tokens per day" not in msg
+            if is_tpm and attempt < max_retries:
+                wait_match = re.search(r"try again in\s+(\d+(?:\.\d+)?)s", msg)
+                wait_sec = float(wait_match.group(1)) + 1.5 if wait_match else 10.0
+                wait_sec = min(max(wait_sec, 3.0), 25.0)
+                print(f"⏳ Groq TPM limit hit. Waiting {wait_sec:.1f}s before retry ({attempt + 1}/{max_retries})...")
+                time.sleep(wait_sec)
+                continue
+            raise
+
+
 def understand_node(state):
     agent = create_understand_agent(llm)
     files = state.get("file_contents") or {
@@ -217,11 +259,16 @@ def understand_node(state):
     }
 
     truncated_files = {}
+    total_chars = 0
     for path, content in files.items():
-        truncated_files[path] = content[:2500] if len(content) > 2500 else content
+        if total_chars >= 9000:
+            break
+        snippet = _truncate_cleanly(content, 4500)
+        truncated_files[path] = snippet
+        total_chars += len(snippet)
 
     try:
-        result = agent.invoke({
+        result = _invoke_with_tpm_retry(agent, {
             "task": state["task"],
             "file_contents": json.dumps(truncated_files, ensure_ascii=False)
         })
@@ -286,7 +333,7 @@ def extract_file_updates_robust(raw_response: str, json_candidate: str = None):
             e for e in entries
             if isinstance(e, dict)
             and any(k in e for k in ("path", "filename", "file_path", "file", "name"))
-            and any(k in e for k in ("content", "code", "new_content", "updated_content", "source"))
+            and any(k in e for k in ("content", "code", "new_content", "updated_content", "source", "append", "edits"))
         ]
         if valid:
             return valid
@@ -353,125 +400,190 @@ def coding_node(state):
     }
 
     truncated_files = {}
+    total_chars = 0
     for path, content in files.items():
-        truncated_files[path] = content[:4000] if len(content) > 4000 else content
+        if total_chars >= 12000:
+            break
+        snippet = _truncate_cleanly(content, 5000)
+        truncated_files[path] = snippet
+        total_chars += len(snippet)
 
-    try:
-        result = agent.invoke({
-            "task": state["task"],
-            "analysis": state["analysis"],
-            "file_contents": json.dumps(truncated_files, ensure_ascii=False),
-            "error_feedback": state.get("debug_result", "")
-        })
-    except Exception as exc:
-        handle_llm_exception(exc)
-        raise exc
+    analysis_text = state.get("analysis", "")
+    if len(analysis_text) > 2000:
+        analysis_text = analysis_text[:2000]
 
-    raw_response = result.content.strip()
-
-    # Step 1: Check for markdown code fences
-    fence_match = re.search(r"```(?:json)?\s*(.*?)\s*```", raw_response, re.DOTALL)
-    if fence_match:
-        json_candidate = fence_match.group(1).strip()
-    else:
-        json_candidate = raw_response
-
-    # Step 2: Extract between outermost brackets ({...} or [...])
-    start_brace = json_candidate.find("{")
-    start_bracket = json_candidate.find("[")
-    starts = [pos for pos in (start_brace, start_bracket) if pos != -1]
-    if starts:
-        first_start = min(starts)
-        if first_start == start_brace:
-            end = json_candidate.rfind("}")
-        else:
-            end = json_candidate.rfind("]")
-        if end > first_start:
-            json_candidate = json_candidate[first_start:end+1].strip()
-
-    # Step 3: Extract updates using multi-strategy robust extractor
-    updates = extract_file_updates_robust(raw_response, json_candidate)
-
-    if updates == []:
-        print("ℹ️ Coding agent determined no file modifications are needed.")
-        state["debug_result"] = ""
-        state["attempts"] = state.get("attempts", 0) + 1
-        return state
-
-    if not updates:
-        print("❌ Raw LLM response received:")
-        print(raw_response[:2000])
-        raise ValueError("Coding agent returned invalid JSON: response must contain file updates.")
+    feedback_text = state.get("debug_result", "")
+    if len(feedback_text) > 2000:
+        feedback_text = feedback_text[-2000:]
 
     approved = {
         path.replace("\\", "/"): path
         for path in files
     }
-    validated = {}
-
     root = os.path.abspath(state["repo_path"])
+    validated = {}
+    syntax_errors = {}
 
-    # Validate ALL updates before writing ANY files
-    for item in updates:
-        if not isinstance(item, dict):
-            print(f"⚠️ Skipping non-dict file entry: {repr(item)[:200]}")
-            continue
+    for syntax_try in range(2):
+        try:
+            result = _invoke_with_tpm_retry(agent, {
+                "task": state["task"],
+                "analysis": analysis_text,
+                "file_contents": json.dumps(truncated_files, ensure_ascii=False),
+                "error_feedback": feedback_text
+            })
+        except Exception as exc:
+            handle_llm_exception(exc)
+            raise exc
 
-        # Normalize alternative key names the LLM may use
-                # Extract path safely
-        path = None
-        for k in ("path", "filename", "file_path", "file", "name"):
-            if k in item and isinstance(item[k], str):
-                path = item[k]
-                break
+        raw_response = result.content.strip()
 
-        # Extract content safely (empty string "" is also valid content!)
-        content = None
-        for k in ("content", "code", "new_content", "updated_content", "source"):
-            if k in item and isinstance(item[k], str):
-                content = item[k]
-                break
+        # Step 1: Check for markdown code fences
+        fence_match = re.search(r"```(?:json)?\s*(.*?)\s*```", raw_response, re.DOTALL)
+        if fence_match:
+            json_candidate = fence_match.group(1).strip()
+        else:
+            json_candidate = raw_response
 
+        # Step 2: Extract between outermost brackets ({...} or [...])
+        start_brace = json_candidate.find("{")
+        start_bracket = json_candidate.find("[")
+        starts = [pos for pos in (start_brace, start_bracket) if pos != -1]
+        if starts:
+            first_start = min(starts)
+            if first_start == start_brace:
+                end = json_candidate.rfind("}")
+            else:
+                end = json_candidate.rfind("]")
+            if end > first_start:
+                json_candidate = json_candidate[first_start:end+1].strip()
 
-        if not isinstance(path, str) or not isinstance(content, str):
-            print(f"⚠️ Skipping file entry with missing path/content. Keys: {list(item.keys())}")
-            print(f"   path={repr(path)[:100]}, content type={type(content).__name__}")
-            continue
+        # Step 3: Extract updates using multi-strategy robust extractor
+        updates = extract_file_updates_robust(raw_response, json_candidate)
 
-        path = path.replace("\\", "/")
+        if updates == []:
+            print("ℹ️ Coding agent determined no file modifications are needed.")
+            state["debug_result"] = ""
+            state["attempts"] = state.get("attempts", 0) + 1
+            return state
 
-        # Safety checks (apply to both existing and new files)
-        if path.startswith("/") or ".." in path.split("/"):
-            raise ValueError(f"Unsafe file path: {path}")
+        if not updates:
+            print("❌ Raw LLM response received:")
+            print(raw_response[:2000])
+            raise ValueError("Coding agent returned invalid JSON: response must contain file updates.")
 
-        if path in validated:
-            raise ValueError(f"Duplicate file update: {path}")
+        validated = {}
+        # Validate ALL updates before writing ANY files
+        for item in updates:
+            if not isinstance(item, dict):
+                print(f"⚠️ Skipping non-dict file entry: {repr(item)[:200]}")
+                continue
 
-        full_path = os.path.abspath(os.path.join(root, path))
+            # Extract path safely
+            path = None
+            for k in ("path", "filename", "file_path", "file", "name"):
+                if k in item and isinstance(item[k], str):
+                    path = item[k]
+                    break
 
-        if os.path.commonpath([root, full_path]) != root:
-            raise ValueError(f"Path escapes repository: {path}")
+            if not isinstance(path, str):
+                print(f"⚠️ Skipping file entry with missing path. Keys: {list(item.keys())}")
+                continue
 
-        is_new_file = path not in approved
+            path = path.replace("\\", "/")
 
-        if is_new_file:
-            print(f"📄 New file will be created: {path}")
+            # Safety checks (apply to both existing and new files)
+            if path.startswith("/") or ".." in path.split("/"):
+                raise ValueError(f"Unsafe file path: {path}")
 
-        validated[path] = content
+            if path in validated:
+                raise ValueError(f"Duplicate file update: {path}")
 
-    if not validated:
-        print("❌ Raw LLM response (first 2000 chars):")
-        print(raw_response[:2000])
-        raise ValueError("Coding agent returned no valid file updates. Check LLM output above.")
+            full_path = os.path.abspath(os.path.join(root, path))
+
+            if os.path.commonpath([root, full_path]) != root:
+                raise ValueError(f"Path escapes repository: {path}")
+
+            # Extract content or apply incremental append / edits on existing file
+            content = None
+            if isinstance(item.get("append"), str) and path in approved:
+                base_text = files[approved[path]].rstrip()
+                content = f"{base_text}\n\n\n{item['append'].lstrip()}\n"
+            elif isinstance(item.get("edits"), list) and path in approved:
+                base_text = files[approved[path]]
+                for edit in item["edits"]:
+                    if not isinstance(edit, dict):
+                        continue
+                    old_snip = edit.get("old", "")
+                    new_snip = edit.get("new", "")
+                    if not isinstance(old_snip, str) or not isinstance(new_snip, str):
+                        continue
+                    if old_snip == "":
+                        base_text = f"{base_text.rstrip()}\n\n\n{new_snip.lstrip()}\n"
+                    elif old_snip in base_text:
+                        base_text = base_text.replace(old_snip, new_snip, 1)
+                content = base_text
+            else:
+                for k in ("content", "code", "new_content", "updated_content", "source"):
+                    if k in item and isinstance(item[k], str):
+                        content = item[k]
+                        break
+
+            if not isinstance(content, str):
+                print(f"⚠️ Skipping file entry with missing content/append/edits. Keys: {list(item.keys())}")
+                continue
+
+            validated[path] = content
+
+        if not validated:
+            print("❌ Raw LLM response (first 2000 chars):")
+            print(raw_response[:2000])
+            raise ValueError("Coding agent returned no valid file updates. Check LLM output above.")
+
+        syntax_errors = {}
+        for path, content in validated.items():
+            if path in approved and len(files[approved[path]]) > 4000 and len(content) < len(files[approved[path]]) * 0.4:
+                syntax_errors[path] = (
+                    f"returned content shrank large existing file from {len(files[approved[path]])} "
+                    f"to {len(content)} chars — use 'append' or 'edits' instead of rewriting the whole file"
+                )
+                continue
+            if path.endswith(".py"):
+                try:
+                    ast.parse(content)
+                except SyntaxError as syn_err:
+                    syntax_errors[path] = f"line {syn_err.lineno}: {syn_err.msg}"
+
+        if not syntax_errors:
+            break
+
+        if syntax_try == 0:
+            err_summary = "; ".join(f"{p} ({msg})" for p, msg in syntax_errors.items())
+            print(f"⚠️ Generated Python syntax error in {err_summary}. Retrying generation...")
+            feedback_text = (
+                f"SYNTAX ERROR in your previous output: {err_summary}. "
+                "Output complete, valid JSON with syntactically valid Python code "
+                "(do not truncate the file or use JS '+' string concatenation).\n\n"
+                + feedback_text
+            )[:2000]
+            time.sleep(3)
 
     # Write files only after all validation succeeds
     for path, content in validated.items():
+        full_path = os.path.abspath(os.path.join(root, path))
+        if path not in approved:
+            if os.path.isfile(full_path):
+                print(f"📄 Updating existing repo file: {path}")
+            else:
+                print(f"📄 New file will be created: {path}")
         if path in approved:
             original_path = approved[path]
         else:
             original_path = path  # new file — use as-is
         write_file(os.path.join(root, original_path), content)
-        files[original_path] = content
+        # Do not overwrite cached file_contents with syntactically broken Python
+        if path not in syntax_errors:
+            files[original_path] = content
 
     state["file_contents"] = files
 
@@ -485,15 +597,58 @@ def coding_node(state):
     return state
 
 
+def _load_referenced_repo_files(
+    repo_path: str,
+    files: dict[str, str],
+    *texts: str,
+    max_added: int = 3,
+) -> dict[str, str]:
+    """Load existing repo files mentioned in error logs or debug analysis if not already loaded."""
+    if not repo_path:
+        return files
+
+    root = os.path.abspath(repo_path)
+    known = {p.replace("\\", "/").lstrip("./") for p in files}
+    pattern = re.compile(r"[A-Za-z0-9_./\\-]+\.(?:py|js|ts|tsx|jsx|json|yml|yaml|toml)")
+    added = 0
+
+    for text in texts:
+        if not text or added >= max_added:
+            break
+        for match in pattern.findall(text):
+            rel = match.replace("\\", "/").lstrip("./")
+            if not rel or rel in known or rel.startswith("/") or ".." in rel.split("/"):
+                continue
+            full_path = os.path.abspath(os.path.join(root, rel))
+            if os.path.commonpath([root, full_path]) != root or not os.path.isfile(full_path):
+                continue
+            try:
+                files[rel] = read_file(full_path)
+                known.add(rel)
+                added += 1
+                print(f"📥 Loaded referenced repo file for fix loop: {rel}")
+                if added >= max_added:
+                    break
+            except Exception:
+                continue
+
+    return files
+
+
 def debug_node(state):
     agent = create_debug_agent(llm)
-    files = state.get("file_contents") or {
+    files = dict(state.get("file_contents") or {
         state["file"]: state["code"]
-    }
+    })
 
     truncated_files = {}
+    total_chars = 0
     for path, content in files.items():
-        truncated_files[path] = content[:2500] if len(content) > 2500 else content
+        if total_chars >= 10000:
+            break
+        snippet = _truncate_cleanly(content, 4500)
+        truncated_files[path] = snippet
+        total_chars += len(snippet)
 
     error = state.get("ci_logs") or state.get("test_result", "")
     if len(error) > 3000:
@@ -501,7 +656,7 @@ def debug_node(state):
     time.sleep(3)
 
     try:
-        result = agent.invoke({
+        result = _invoke_with_tpm_retry(agent, {
             "task": state["task"],
             "code": json.dumps(truncated_files, ensure_ascii=False),
             "test_result": error
@@ -510,6 +665,12 @@ def debug_node(state):
         handle_llm_exception(exc)
         raise exc
 
+    state["file_contents"] = _load_referenced_repo_files(
+        state.get("repo_path", ""),
+        files,
+        error,
+        result.content,
+    )
     state["debug_result"] = result.content
     print(f"\n🐛 Debug Analysis:\n{result.content[:500]}...\n")
     return state

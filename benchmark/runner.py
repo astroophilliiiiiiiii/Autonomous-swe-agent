@@ -18,7 +18,7 @@ if sys.platform == "win32":
     if hasattr(sys.stderr, "reconfigure"):
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from tools.repo import clone_repo, list_directory
+from tools.repo import clone_repo, list_directory, filter_candidate_files
 from tools.file_tools import read_file
 from agents.file_selector import create_file_selector
 from backend.llm import llm
@@ -55,9 +55,10 @@ def execute_single_task(task_def: dict, workspace_dir: str = "workspace/repo") -
     try:
         repo_path = clone_repo(repo_url, workspace_dir)
         files = list_directory(repo_path)
+        candidate_files = filter_candidate_files(files, task_prompt)
 
         file_selector = create_file_selector(llm)
-        selector_res = file_selector.invoke({"task": task_prompt, "files": files})
+        selector_res = file_selector.invoke({"task": task_prompt, "files": candidate_files})
 
         # Match relevant files
         normalized_repo_files = {f.replace("\\", "/"): f for f in files}
