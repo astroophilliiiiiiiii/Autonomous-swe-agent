@@ -16,6 +16,23 @@ def is_docker_available() -> bool:
         return False
 
 
+SANDBOX_IMAGE = "swe-agent-env"
+
+
+def is_sandbox_image_built() -> bool:
+    """Checks whether the sandbox Docker image has been built locally."""
+    try:
+        res = subprocess.run(
+            ["docker", "image", "inspect", SANDBOX_IMAGE],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
 def run_tests(repo_path: str) -> str:
     """
     Runs tests on the target repository.
@@ -27,7 +44,12 @@ def run_tests(repo_path: str) -> str:
     abs_repo_path = os.path.abspath(repo_path)
 
     # 1. Use Docker sandbox if available
-    if is_docker_available():
+    docker_ready = is_docker_available()
+    if docker_ready and not is_sandbox_image_built():
+        print(f"⚠️ Docker image '{SANDBOX_IMAGE}' not found. Build it with: docker build -t {SANDBOX_IMAGE} .")
+        docker_ready = False
+
+    if docker_ready:
         container_name = f"swe_runner_{os.getpid()}"
         test_script = (
             "if [ -f requirements.txt ]; then pip install --no-cache-dir -q -r requirements.txt; fi; "
@@ -40,9 +62,10 @@ def run_tests(repo_path: str) -> str:
             "--name", container_name,
             "--cpus=2.0",
             "--memory=1024m",
+            "-e", "PYTHONDONTWRITEBYTECODE=1",
             "-v", f"{abs_repo_path}:/app/workspace/repo",
             "-w", "/app/workspace/repo",
-            "swe-agent-env", 
+            SANDBOX_IMAGE,
             "sh", "-c", test_script
         ]
 
@@ -85,9 +108,11 @@ def run_tests(repo_path: str) -> str:
             extra_paths.append(src_path)
         existing_pypath = test_env.get("PYTHONPATH", "")
         test_env["PYTHONPATH"] = os.pathsep.join(extra_paths) + (os.pathsep + existing_pypath if existing_pypath else "")
+        # Keep __pycache__ / .pytest_cache out of the target repo so they don't end up in the commit
+        test_env["PYTHONDONTWRITEBYTECODE"] = "1"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", "-v"],
+            [sys.executable, "-m", "pytest", "-v", "-p", "no:cacheprovider"],
             cwd=abs_repo_path,
             env=test_env,
             capture_output=True,

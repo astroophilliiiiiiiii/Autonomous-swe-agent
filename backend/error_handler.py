@@ -59,7 +59,7 @@ Details:
   {raw_msg}
 
 How to fix:
-  1. Open the .env file in the project root: F:\\autonomous-swe-agent\\.env
+  1. Open the .env file in the project root.
   2. Ensure GROQ_API_KEY is set correctly.
   3. Verify or generate a new key at: https://console.groq.com/keys
 ══════════════════════════════════════════════════════════════════════════════"""
@@ -78,9 +78,7 @@ Details:
 
 How to fix:
   1. Open backend/llm.py
-  2. Check the model name. Currently available models include:
-     - openai/gpt-oss-120b
-     - qwen/qwen3.8-27b
+  2. Check the model name (default: openai/gpt-oss-120b).
   3. Check the full list of active models at: https://console.groq.com/docs/models
 ══════════════════════════════════════════════════════════════════════════════"""
 

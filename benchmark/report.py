@@ -96,13 +96,12 @@ def generate_metrics_report(benchmark_data: dict) -> str:
     if metrics['multi_attempt_count'] > 0:
         md.append(f"| **Self-Healing Rate** | `{metrics['self_healing_rate']}%` ({metrics['self_healed_count']}/{metrics['multi_attempt_count']}) | Automated debug-loop error correction on test failures |")
     else:
-        md.append(f"| **Self-Healing Rate** | `100.0%` (0 debug escalations needed) | Agent succeeded on first pass |")
+        md.append(f"| **Self-Healing Rate** | `N/A` (no debug retries needed) | Agent succeeded on first pass |")
     md.append(f"| **Avg Execution Time** | `{metrics['avg_execution_time']}s` | Average turnaround time per task |")
 
-    md.append("\n## 📝 Resume-Ready Bullet Points")
-    md.append("You can copy-paste any of these directly into your resume under Experience or Projects:\n")
+    md.append("\n## 📝 Summary")
     md.append("```text")
-    md.append(f"• Architected an autonomous SWE Agent using LangGraph, LangChain, and Groq/Llama-3, automating end-to-end bug fixing, code generation, and test validation.")
+    md.append(f"• Autonomous SWE Agent built with LangGraph, LangChain, and Groq (gpt-oss-120b), automating end-to-end bug fixing, code generation, and test validation.")
     md.append(f"• Evaluated across {metrics['total_repos']} repositories and {metrics['total_tasks']} tasks, achieving a {metrics['task_success_rate']}% task completion rate and {metrics['test_pass_rate']}% test pass rate in isolated Docker sandboxes.")
     if metrics['multi_attempt_count'] > 0:
         md.append(f"• Implemented self-healing reflection loops capable of diagnosing pytest traces, yielding a {metrics['self_healing_rate']}% autonomous error recovery rate.")
@@ -132,7 +131,7 @@ def generate_metrics_report(benchmark_data: dict) -> str:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate resume metrics report from benchmark results")
+    parser = argparse.ArgumentParser(description="Generate metrics report from benchmark results")
     parser.add_argument("results_file", nargs="?", default="benchmark/results/latest.json", help="Path to results JSON file")
 
     args = parser.parse_args()

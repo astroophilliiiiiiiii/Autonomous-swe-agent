@@ -2,7 +2,7 @@
 
 An AI-powered, multi-agent system that automates end-to-end software engineering workflows — from code analysis and bug fixing to testing, debugging, and GitHub pull request creation.
 
-**Tech Stack:** Python · LangGraph · LangChain · Groq LLM (Llama-3) · Docker · Pytest · Git · GitHub REST API
+**Tech Stack:** Python · LangGraph · LangChain · Groq LLM (gpt-oss-120b) · Docker · Pytest · Git · GitHub REST API
 
 ---
 
@@ -10,10 +10,10 @@ An AI-powered, multi-agent system that automates end-to-end software engineering
 
 ```mermaid
 flowchart TD
-    A([Repository + Task]) --> B[Create Git Branch]
+    A([Repository + Task]) --> D[File Selector - Identify Relevant Files]
+    D --> B[Create Git Branch]
     B --> C[Understand Agent]
-    C --> D[Identify Relevant Files]
-    D --> E[Coding Agent]
+    C --> E[Coding Agent]
     E --> F[Testing Agent - Docker Sandbox]
     F --> G{Tests Passed?}
     G -- Yes --> H[Commit & Push]
@@ -91,6 +91,12 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
+(Optional) Build the Docker sandbox image used for running tests. If the image or Docker is not available, tests run in the host Python environment instead:
+
+```bash
+docker build -t swe-agent-env .
+```
+
 Create a `.env` file:
 
 ```env
@@ -104,7 +110,7 @@ GITHUB_TOKEN=your_github_token
 python -m backend.main
 ```
 
-Follow the prompts to provide a GitHub repository URL and task description.
+Follow the prompts to provide a GitHub repository URL and task description. Type `END` on a new line to finish the task input. Run the command from the project root.
 
 ### Run Benchmarks
 
@@ -141,6 +147,13 @@ Task: Add a factorial method to the Calculator class with unit tests.
 5. If tests fail → Debug agent analyzes errors → Coding agent fixes → Re-test
 6. Commits, pushes, and creates a GitHub pull request
 7. Polls GitHub Actions CI and reports final status
+
+## Known Limitations
+
+- Supports Python repositories tested with pytest.
+- The coding agent rewrites whole files, and file contents sent to the LLM are truncated (~4000 characters), so it works best on small-to-medium files.
+- Fix attempts are capped at 3 local retries and 3 CI retries.
+- Docker sandboxing is used when available; otherwise tests run in the host environment.
 
 ## License
 

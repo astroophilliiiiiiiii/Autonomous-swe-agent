@@ -1,6 +1,6 @@
 # 📊 SWE-Agent Benchmarking & Evaluation Suite
 
-This framework enables empirical, quantitative evaluation of the Autonomous SWE Agent across multiple repositories and tasks to generate verified, resume-ready metrics.
+This framework enables empirical, quantitative evaluation of the Autonomous SWE Agent across multiple repositories and tasks and produce measurable performance metrics.
 
 ---
 
@@ -43,9 +43,9 @@ python -m benchmark.runner --limit 5
 
 ---
 
-## 📋 Generating Resume Reports
+## 📋 Generating Reports
 
-After running the benchmark, generate your updated report and resume bullet points anytime with:
+After running the benchmark, regenerate the metrics report anytime with:
 ```bash
 python -m benchmark.report
 ```

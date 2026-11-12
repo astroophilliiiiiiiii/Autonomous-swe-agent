@@ -119,7 +119,11 @@ def summary_node(state):
         return state
     
     # 2. 💾 Commit
-    commit_msg = f"Auto-fix: {task}"
+    # Use only the first line of the task so commit messages / PR titles stay short
+    first_line = next((l.strip() for l in task.splitlines() if l.strip()), "Automated change")
+    if len(first_line) > 72:
+        first_line = first_line[:69].rstrip() + "..."
+    commit_msg = f"Auto-fix: {first_line}"
     commit_result = commit_changes(repo, commit_msg)
     if not commit_result:
         print("⚠️ Commit failed or working tree clean.")
@@ -142,7 +146,7 @@ def summary_node(state):
             repo_name=state["repo_name"],
             branch_name=branch,
             title=commit_msg,
-            description=f"Fixed issue automatically.\n\nChanges:\n{diff_changes}"
+            description=f"Fixed issue automatically.\n\nTask:\n{task}\n\nChanges:\n{diff_changes}"
         )
         if not pr_link:
             print("⚠️ Pull Request creation failed. Continuing with local summary.")
@@ -151,7 +155,7 @@ def summary_node(state):
             try:
                 pr_number = int(pr_link.split("/")[-1])
                 state["pr_number"] = pr_number
-            except:
+            except ValueError:
                 print("Warning: Could not extract PR number from URL.")
     
     # 5. 📝 Final Summary

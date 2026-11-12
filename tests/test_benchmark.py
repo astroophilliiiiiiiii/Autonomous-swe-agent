@@ -49,5 +49,5 @@ def test_calculate_metrics_with_data():
 
     report = generate_metrics_report(sample_data)
     assert "Autonomous SWE-Agent Benchmark" in report
-    assert "Resume-Ready Bullet Points" in report
+    assert "## 📝 Summary" in report
 
